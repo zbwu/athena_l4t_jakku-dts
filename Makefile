@@ -5,13 +5,16 @@ dtbo-y :=
 makefile-path := platform/t19x/jakku/kernel-dts
 
 BUILD_ENABLE=n
+BUILD_ATHENA=n
 ifneq ($(filter y,$(CONFIG_ARCH_TEGRA_19x_SOC) $(CONFIG_ARCH_TEGRA_194_SOC)),)
-BUILD_ENABLE=y
+# Only build athena dts
+BUILD_ATHENA=y
 endif
 
 dtb-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-0000-p3509-0000.dtb
 dtb-$(BUILD_ENABLE) += tegra194-p3668-0001-p3509-0000.dtb
+dtb-$(BUILD_ATHENA) += tegra194-p3668-0001-p2151-0000.dtb
 dtb-$(CONFIG_ARCH_TEGRA_19x_SOC) += tegra194-p3668-all-p3509-0000-kexec.dtb
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-hdr40.dtbo
 dtbo-$(BUILD_ENABLE) += tegra194-p3668-all-p3509-0000-adafruit-sph0645lm4h.dtbo
