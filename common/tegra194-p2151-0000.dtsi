@@ -15,6 +15,7 @@
 #include "tegra194-fixed-regulator-p2151-0000.dtsi"
 #include "tegra194-p2151-disp.dtsi"
 #include "tegra194-audio-p3668.dtsi"
+#include "tegra194-camera-p2151.dtsi"
 
 / {
 	gpio-keys {
@@ -34,30 +35,14 @@
 			gpio-key,wakeup;
 		};
 	};
-	eeprom-manager {
-		data-size = <0x100>;
-		bus@0 {
-			i2c-bus = <&gen1_i2c>;
-			eeprom@1 {
-				slave-address = <0x57>;
-				label = "cvb";
-			};
-		};
 
-		bus@1 {
-			i2c-bus = <&gen2_i2c>;
-			eeprom@1 {
-				slave-address = <0x50>;
-				label = "super-module";
-			};
-		};
-	};
 #if TEGRA_PWM_FAN_DT_VERSION == DT_VERSION_2
 	pwm-fan {
 		compatible = "pwm-fan";
 		status = "okay";
 		#pwm-cells = <1>;
 		pwms = <&tegra_pwm8 0 45334>;
+		fan-supply = <&vdd_soc_fan>;
 		profiles {
 			default = "quiet";
 			quiet {
@@ -73,6 +58,7 @@
 		status = "okay";
 		#pwm-cells = <1>;
 		pwms = <&tegra_pwm6 0 45334>;
+		fan-supply = <&vdd_case_fan>;
 		profiles {
 			default = "quiet";
 			quiet {
@@ -163,6 +149,39 @@
 			};
 		};
 	};
+	realsense_switch {
+		compatible = "reg-userspace-consumer";
+		regulator-name = "realsense_switch";
+		regulator-supplies = "default";
+		default-supply = <&vbus_realsns_5v>;
+		status = "okay";
+	};
+	wifi_bt_switch {
+		compatible = "reg-userspace-consumer";
+		regulator-boot-on;
+		regulator-name = "wifi_bt_switch";
+		regulator-supplies = "default";
+		default-supply = <&vdd_3v3_wlan_bt>;
+		status = "okay";
+	};
+	gps_switch {
+		compatible = "reg-userspace-consumer";
+		regulator-name = "gps_switch";
+		regulator-supplies = "vdd-3v3", "vdd-1v8";
+		vdd-3v3-supply = <&vdd_3v3_gps>;
+		vdd-1v8-supply = <&vdd_1v8_gps>;
+		status = "okay";
+	};
+	mcu_sensor_switch {
+		compatible = "reg-userspace-consumer";
+		regulator-name = "mcu_sensor_switch";
+		regulator-boot-on;
+		regulator-supplies = "head", "bot", "rear";
+		head-supply = <&head_mcu_sensor>;
+		bot-supply = <&bot_mcu_sensor>;
+		rear-supply = <&rear_mcu_sensor>;
+		status = "okay";
+	};
 	serial@3110000 {
 		status = "okay";
 	};
@@ -170,31 +189,17 @@
 	serial@3140000 {
 		status = "disabled";
 	};
+	// Case Tech
 	tachometer@39c0000 {
 		status = "okay";
 	};
-	pwm@3280000 {
+	// Case Fan
+	tegra_pwm6: pwm@32d0000 {
 		status = "okay";
 	};
-
-	pwm@32c0000 {
+	// SoC Fan
+	tegra_pwm8: pwm@32f0000 {
 		status = "okay";
-	};
-
-	pwm@32d0000 {
-		status = "okay";
-	};
-
-	pwm@32f0000 {
-		status = "okay";
-	};
-
-	spi@c260000 {
-		status = "disabled";
-	};
-
-	spi@3300000 {
-		status = "disabled";
 	};
 
 	sdhci@3400000 {
@@ -242,7 +247,7 @@
 	
 	// NX     Ball  CVM/NX       NX/P3509           P2151
 	// GPIO00 PZ.01 USB_VBUS_EN0                    [USB0_VBUS_DET]
-	// GPIO01 PQ.05 CLK_CAM0                        [?TAS5805]
+	// GPIO01 PQ.05 EXTPERIPH3                      [OV7251_L_MCLK]
 	// GPIO02 PQ.03              (BT_M2_WAKE_AP)    [TOUCH_INT]
 	// GPIO03 CC.00              (BT_M2_EN)
 	// GPIO04 CC.01              (PWR_LED_CTRL)
@@ -252,8 +257,8 @@
 	// GPIO08 PQ.02 SDMMC_CD                        [CASE_FAN_TACH]
 	// GPIO09 PS.04 AUD_MCLK
 	// GPIO10 PQ.01              (M2E_ALERT)        [GPIO_EXP1_INT]
-	// GPIO11 PQ.06 CLK_CAM1
-	// GPIO12 CC.04                                 [GPIO_EXP2_INT]
+	// GPIO11 PQ.06 EXTPERIPH4
+	// GPIO12 CC.04 PWM4                            [GPIO_EXP2_INT]
 	// GPIO13 PN.01 PWM1
 	// GPIO14 PH.01 PWM6                            [CASE_FAN_PWM]
 
@@ -263,7 +268,6 @@
 		gpio_expand2: tca6424@22 {
 			compatible = "ti,tca6424"; // gpio-pca953x
 			reg = <0x22>;
-			// reset-gpio is not property of gpio-pca953x
 			// share a reset pin for two expanders is a dangerous design
 			// reset-gpio = <&tegra_aon_gpio TEGRA194_AON_GPIO(CC, 3) GPIO_ACTIVE_HIGH>;
 			gpio-controller;
@@ -275,13 +279,13 @@
 			#interrupt-cells = <2>;
 			// x_LABEL is NOT sure
 			gpio-line-names =
-				"x_PROG_UTRA_F",   "x_NULL",             "x_RSTN_UTRA_F",      "x_PROG_UTRA_R",
+				"x_PROG_UTRA_F",   "x_NULL",             "x_RSTN_UTRA_F",      "CASE_FAN_EN",
 				"x_RSTN_HUB",      "x_RSTN_UTRA_R",      "x_INT_TOUCHPAD",     "TOUCHPAD_NRST",
 				"x_LED_DRIVER_EN", "x_NULL",             "GPS_NSTANDBY",       "x_H_HOST_REQ",
 				"x_MCU_RDY_GPS",   "x_MCU_REQ_GPS",      "FLASH_LED",          "TORCH_LED",
 				"GPS_3V3_EN",      "HEAD_SENSOR_3V3_EN", "SND_PA_1V8_EN",      "SND_CODEC_1V8_EN",
 				"GPS_1V8_EN",      "WLAN_BT_3V3_EN",     "REAR_SENSOR_3V3_EN", "x_SENSOR_1V8_EN";
-			// 03 PWM_FAN: PROG_UTRA_R, unknown
+			// 03 CASE_FAN_EN: PROG_UTRA_R, unknown
 			// 07 TOUCHPAD_NRST: Synaptics touchpad reset, Low on reset
 			// 10 GPS_NSTANDBY: AP6155G/BCM4775 nstandby, Low on standby. Exposed to user space
 			// 14 FLASH_LED: Flash LED, high enable
@@ -330,8 +334,6 @@
 		tas5805m: tas5805m@2c {
 			compatible = "ti,tas5805m";
 			reg = <0x2c>;
-			// pdn-enable-gpio = <&gpio_expand1 7 GPIO_ACTIVE_HIGH>; //PWDN_PA
-			// pa-1v8-enable-gpio = <&gpio_expand2 18 GPIO_ACTIVE_HIGH>; //CODEC_PA_DVDD_1V8_EN
 			dvdd-supply = <&dvdd_codec_amp_1v8>;
 			pvdd-supply = <&pvdd_amp_12v>;
 			status = "disabled";
@@ -340,11 +342,49 @@
 		rt5680: rt5680@2d {
 			compatible = "realtek,rt5679";
 			reg = <0x2d>;
-			// codec-pa-1v8-enable-gpio = <&gpio_expand2 18 GPIO_ACTIVE_HIGH>; //CODEC_PA_DVDD_1V8_EN
-			// codec-1v8-enable-gpio = <&gpio_expand2 19 GPIO_ACTIVE_HIGH>; //CODEC_AVDD_1V8_EN
 			dvdd-supply = <&dvdd_codec_amp_1v8>;
 			avdd-supply = <&avdd_codec_1v8>;
 			status = "disabled";
+		};
+	};
+
+#define	CAM1_PWDN	TEGRA194_MAIN_GPIO(P, 4)
+#define	CAM2_PWDN	TEGRA194_MAIN_GPIO(P, 5)
+#define	CAM3_PWDN	20
+
+	i2c@3180000 {
+		ov7251_a@61 { // OV7251_R
+			clocks = <&bpmp_clks TEGRA194_CLK_EXTPERIPH2>,
+				 <&bpmp_clks TEGRA194_CLK_PLLP_OUT0>;
+			clock-names = "extperiph2", "pllp_grtba";
+			mclk = "extperiph2";
+			clock-frequency = <24000000>;
+			pwdn-gpios = <&tegra_main_gpio CAM2_PWDN GPIO_ACTIVE_HIGH>;
+			vana-supply = <&avdd_cam2_2v8>;
+			vif-supply = <&iovdd_cam_1v8>;
+			status = "okay";
+		};
+		ov7251_b@62 { // OV7251_L
+			clocks = <&bpmp_clks TEGRA194_CLK_EXTPERIPH3>,
+				 <&bpmp_clks TEGRA194_CLK_PLLP_OUT0>;
+			clock-names = "extperiph3", "pllp_grtba";
+			mclk = "extperiph3";
+			clock-frequency = <24000000>;
+			pwdn-gpios = <&gpio_expand1 CAM3_PWDN GPIO_ACTIVE_HIGH>;
+			vana-supply = <&avdd_cam3_2v8>;
+			vif-supply = <&iovdd_cam_1v8>;
+			status = "okay";
+		};
+		ov13b10_e@36 {
+			clocks = <&bpmp_clks TEGRA194_CLK_EXTPERIPH1>,
+				 <&bpmp_clks TEGRA194_CLK_PLLP_OUT0>;
+			clock-names = "extperiph1", "pllp_grtba";
+			mclk = "extperiph1";
+			clock-frequency = <19200000>;
+			pwdn-gpios = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
+			vana-supply = <&avdd_cam1_2v8>;
+			vif-supply = <&iovdd_cam_1v8>;
+			status = "okay";
 		};
 	};
 
@@ -354,7 +394,7 @@
 		synaptics_dsx@20 {
  			compatible = "synaptics,dsx-i2c";
  			reg = <0x20>;
- 			status = "okay";
+			status = "disabled";
  			interrupt-parent = <&tegra_main_gpio>;
  			interrupts = <TEGRA194_MAIN_GPIO(Q, 3)  0x2002>;
  			synaptics,ub-i2c-addr = <0x2c>;
@@ -377,20 +417,9 @@
 		compatible = "bcm4775";
 		vdd-supply = <&vdd_1v8_gps>;
 		vddgps-supply = <&vdd_3v3_gps>;
-		//gps-1v8-gpio = <&gpio_expand2 20 GPIO_ACTIVE_LOW>;
-		//gps-bt-3v3-gpio = <&gpio_expand2 21 GPIO_ACTIVE_LOW>;
 		nstandby-gpio = <&gpio_expand2 10 GPIO_ACTIVE_LOW>;
-		//bt-en-gpio = <&gpio_expand1 8 GPIO_ACTIVE_LOW>;
-		//wlan-en-gpio = <&gpio_expand1 11 GPIO_ACTIVE_LOW>;
 		status = "disabled";
 	};
-
-	// bcmdhd_wlan {
-	// 	compatible = "bcmdhd_wlan";
-	// 	vddwlan-supply = <&vdd_3v3_wlan_bt>;
-	// 	//bt-en-gpio = <&gpio_expand1 8 GPIO_ACTIVE_LOW>;
-	// 	//wlan-en-gpio = <&gpio_expand1 11 GPIO_ACTIVE_LOW>;
-	// };
 
 	leds {
 		flash {
